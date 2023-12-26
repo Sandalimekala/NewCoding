@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX_PROCESSES 10
+#define MAX_QUEUES 3
+
+typedef struct Process {
+ int arrival_time;
+ int burst_time;
+ int remaining_burst;
+ int priority;
+
+ int wait_time;
+ int age; // Added for aging mechanism
+} Process;
+
+typedef struct Queue {
+ Process processes[MAX_PROCESSES];
+ int front, rear;
+} Queue;
+
+Queue queues[MAX_QUEUES];
+int current_time;
+Process* running_process;
+int time_quantum;
+int escalation_threshold;
+int aging_rate; // Added for aging mechanism
+
+void init_simulation(int num_processes, Process processes[]) {
+ current_time = 0;
+ running_process = NULL;
+ for (int i = 0; i < MAX_QUEUES; i++) {
+ queues[i].front = 0;
+ queues[i].rear = 0;
+ }
+ time_quantum = 2; // Set time quantum
+ escalation_threshold = 5; // Set escalation threshold
+ aging_rate = 1; // Set aging rate for aging mechanism
+ for (int i = 0; i < num_processes; i++) {
+
+ processes[i].age = 0; // Initialize age for each process
+ enqueue(&queues[processes[i].priority], processes[i]);
+ }
+}
+
+void simulate() {
+ while (any_queue_nonempty()) {
+ run_process();
+ update_queues();
+ age_processes();
+ escalate_processes();
+ current_time++;
+ }
+ print_statistics();
+}
+
+void run_process() {
+ if (!running_process) {
+ select_next_process();
+ }
+ if (running_process) {
+ running_process->remaining_burst -= min(running_process->remaining_burst, 
+time_quantum);
+ if (running_process->remaining_burst == 0) {
+ dequeue(&queues[running_process->priority], running_process);
+ running_process = NULL;
+ }
+
+ }
+}
+
+void update_queues() {
+ for (int i = 0; i < MAX_QUEUES; i++) {
+ while (queues[i].front != queues[i].rear) {
+ if (queues[i].processes[queues[i].front].remaining_burst == 0) {
+ dequeue(&queues[i], NULL);
+ } else {
+ break;
+ }
+ }
+ }
+}
+
+void age_processes() {
+ for (int i = 1; i < MAX_QUEUES; i++) {
+ for (int j = queues[i].front; j != queues[i].rear; j = (j + 1) % MAX_PROCESSES) {
+ queues[i].processes[j].age += aging_rate;
+ }
+ }
+}
+
+void escalate_processes() {
+ for (int i = 0; i < MAX_QUEUES - 1; i++) {
+ for (int j = queues[i].front; j != queues[i].rear; j = (j + 1) % MAX_PROCESSES) {
+ if (queues[i].processes[j].age >= escalation_threshold) {
+
+ dequeue(&queues[i], &queues[i + 1].processes[queues[i + 1].rear]);
+ queues[i + 1].rear = (queues[i + 1].rear + 1) % MAX_PROCESSES;
+ queues[i + 1].processes[queues[i + 1].rear].age = 0; // Reset age after escalation
+ }
+ }
+ }
+}
+void select_next_process() {
+ for (int i = 0; i < MAX_QUEUES; i++) {
+ if (queues[i].front != queues[i].rear) {
+ running_process = &queues[i].processes[queues[i].front];
+ break;
+ }
+ }
+}
+void print_statistics() {
+ // Calculate and print average waiting time, turnaround time, and CPU utilization
+ // ...
+}
